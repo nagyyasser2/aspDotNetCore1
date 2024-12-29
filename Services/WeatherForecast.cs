@@ -1,4 +1,4 @@
-namespace aspDotNetCore
+namespace aspDotNetCore.Services
 {
     public class WeatherForecast
     {
