@@ -1,129 +1,197 @@
-# ASP.NET Core Middleware
+# ASP.NET Core Action Filters
 
-Middleware in ASP.NET Core is a modular component in the request-response pipeline, handling HTTP requests and responses in a sequential manner. Middleware can perform a wide range of tasks such as authentication, logging, request modification, response generation, and routing.
-
-### Key Characteristics of Middleware:
-- **Request Processing:** Middleware can process requests and generate responses or pass the request to the next middleware.
-- **Execution Order:** Middleware components are executed in the order they are configured.
-- **Short-circuiting:** Middleware can terminate further processing in the pipeline based on certain conditions.
-
-This modular approach allows for flexible and efficient management of HTTP traffic in ASP.NET Core applications.
-
-![Middleware Image](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTz5FqtfhjU3yO_Zyp4TXRLS2OJQfIzO4A8eK5zBKF8JcTSyQtWbuxvw0WszhwpHsoSRoM)
+Action Filters in ASP.NET Core API are used to execute custom logic before or after an action method runs, enabling tasks like logging, authentication, or data transformation.
 
 ---
 
-## How to Create a Custom Middleware
+### Key Characteristics of Action Filters
 
-Creating a custom middleware in ASP.NET Core involves defining a class that processes HTTP requests in the pipeline. Below are the steps to create a simple profiling middleware.
+- **Action-Specific Execution:** Action filters execute custom logic before or after the execution of an action method or its result.
+- **Cross-Cutting Concerns:** Ideal for handling cross-cutting concerns such as logging, validation, and error handling specific to controller actions.
+- **Execution Order:** Filters are executed in a specific order based on their registration, with global filters running first, followed by controller-level and then action-level filters.
+- **Short-Circuiting:** Filters can modify or terminate the request/response pipeline by skipping the action method or altering the result.
 
-### Step 1: Create the Middleware Class
+---
 
-1. Create a folder named `Middlewares` in your project (if not already created).
-2. Inside the `Middlewares` folder, create a file called `ProfilingMiddleware.cs` and define the middleware logic.
+![ActionFilter Image](https://umbracare.net/media/jirailjj/asp-net-core-filters-pipeline.jpg?rmode=pad&width=1200&height=630&bgcolor=fff&v=1da493c363b43d0)
+
+---
+
+## How to Create an Action Filter?
+
+Creating a custom action filter in ASP.NET Core involves defining a class that processes HTTP requests in the pipeline. Below are the steps to create a simple `LogActivityFilter`.
+
+---
+
+### Step 1: Create the ActionFilter Class
+
+1. Create a folder named `Filters` in your project (if not already created).
+2. Inside the `Filters` folder, create a file called `LogActivityFilter.cs` and define the Action Filter logic.
 
 ```csharp
-using System.Diagnostics;
+// LogActivityFilter.cs
+using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace aspDotNetCore.Middlewares
+namespace aspDotNetCore.Filters
 {
-    public class ProfilingMiddleware
+    public class LogActivityFilter : IActionFilter
     {
-        private readonly RequestDelegate _next;
-        private readonly ILogger<ProfilingMiddleware> _logger;
+        private readonly ILogger<LogActivityFilter> _logger;
 
-        // Constructor for injecting dependencies
-        public ProfilingMiddleware(RequestDelegate next, ILogger<ProfilingMiddleware> logger)
+        public LogActivityFilter(ILogger<LogActivityFilter> logger)
         {
-            _next = next;
             _logger = logger;
         }
 
-        // The Invoke method is called for every HTTP request
-        public async Task Invoke(HttpContext context)
+        public void OnActionExecuting(ActionExecutingContext context)
         {
-            var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation($"Executing Action {context.ActionDescriptor.DisplayName} on Controller {context.Controller}, With Args {context.ActionArguments}");
+        }
 
-            try
-            {
-                // Call the next middleware in the pipeline
-                await _next(context);
-            }
-            finally
-            {
-                // Log the time taken for the request processing
-                stopwatch.Stop();
-                var elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-                _logger.LogInformation("Request for {Path} took {ElapsedMilliseconds}ms", context.Request.Path, elapsedMilliseconds);
-            }
+        public void OnActionExecuted(ActionExecutedContext context)
+        {
+            _logger.LogInformation($"Action {context.ActionDescriptor.DisplayName} Finished on Controller {context.Controller}");
         }
     }
 }
 ```
-### Step 2: Register the Middleware in `Program.cs`
 
-To enable the middleware in your application, you need to register it in the pipeline. Open your `Program.cs` file and add the following line:
+---
+
+### Step 2: Register the ActionFilter in `Program.cs`
+
+To enable the action filter in your application, register it in the pipeline. Open your `Program.cs` file and add the following line:
 
 ```csharp
-app.UseMiddleware<ProfilingMiddleware>();
+builder.Services.AddControllers(opt =>
+{
+    opt.Filters.Add<LogActivityFilter>();
+});
 ```
-This will ensure that your middleware is executed for every HTTP request.
 
-## Instructions for Creating Custom Middleware
+> **Note:** The above registration is a **global** registration, meaning it will apply to all controllers and actions.
 
-Follow these steps to create your own custom middleware:
+---
 
-1. Create a Middleware Class:
+### Step 3: Apply the Filter at the Controller or Action Level (Optional)
 
-    - Define a class like `ProfilingMiddleware`. This class should not implement any other interfaces such as `IActionFilter` or `IExceptionFilter`.
+If you prefer to apply the filter to a specific controller or action instead of globally, you can use the `[ServiceFilter]` or `[TypeFilter]` attribute.
+
+```csharp
+[ServiceFilter(typeof(LogActivityFilter))]
+public class ExampleController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult GetExample()
+    {
+        return Ok("Action Filter Example");
+    }
+}
+```
+
+---
+
+### Anohter Example About Action Filter Specific On Controller Or Action Method
+
+### Step 1: Create the `LogSensitiveActionAttribute.cs` Class
+
+1. Create a folder named `Filters` in your project (if not already created).
+2. Inside the `Filters` folder, create a file called `LogSensitiveActionAttribute.cs` and define the Action Filter logic.
+
+```csharp
+//LogSensitiveActionAttribute.cs
+
+using Microsoft.AspNetCore.Mvc.Filters;
+
+namespace aspDotNetCore.Filters
+{
+    public class LogSensitiveActionAttribute: ActionFilterAttribute
+    {
+        public override void OnActionExecuted(ActionExecutedContext context)
+        {
+            Console.WriteLine("Sentetive Action Executed...");
+        }
+    }
+}
+
+```
+---
+
+### Step 2: Register the ActionFilter On `Contorller`
+
+```csharp
+ [Route("api/[controller]")]
+    [ApiController]
+    [LogSensitiveAction]
+    public class ProductsController : ControllerBase
+    { }
+```
+---
+
+### Step 3: Register the ActionFilter On `Action` .
+
+```csharp
+// Get a product by ID
+
+[HttpGet]
+[Route("{key}")]
+[LogSensitiveAction]
+public ActionResult<Product> GetProduct([FromRoute(Name = "key")] int id)
+{
+    _logger.LogDebug("trying  to get product with id#{id} ", id);
+    var product = _dbContext.Set<Product>().Find(id);
+    if (product == null)
+    {
+        _logger.LogWarning("Product #{id}, Not Found!", id);
+        return NotFound($"Product with ID {id} not found.");
+    }
+
+    return Ok(product);
+}
+```
+---
+
+> **Note:** We Can Still Register The ActionAttribute In `Program.cs` .
+
+```csharp
+// Program.cs 
+
+builder.Services.AddControllers(opt =>
+{
+    opt.Filters.Add<LogActivityFilter>();
+    opt.Filters.Add<LogSensitiveActionAttribute>();
+});
+```
 
 
-2. Inject Dependencies:
-
-    - Inject the `RequestDelegate` in the middleware constructor. The `RequestDelegate` is used to pass the request to the next middleware in the pipeline.
-
-3. Implement the Invoke Method:
-
-    - The `Invoke` method receives the `HttpContext` and processes the request. You can execute any custom logic here (e.g., logging, performance profiling, authentication, etc.).
-
-4. Register the Middleware:
-
-    - Add the middleware in the desired order within the `Program.cs` file using `app.UseMiddleware<YourMiddlewareClass>().` The order in which you register the middleware determines the order of execution in the pipeline.
 
 
+---
+
+## Key Differences Between Action Filters and Middleware
+
+| Feature                    | Action Filters                                                                 | Middleware                                                                                     |
+|----------------------------|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| **Scope**                  | Specific to controller actions.                                                | Applies to the entire HTTP request/response pipeline.                                         |
+| **Customization**          | Can access detailed action-level metadata.                                     | Can modify `HttpRequest` and `HttpResponse` objects.                                          |
+| **Use Cases**              | Logging, validation, caching, and error handling for specific controllers.     | Authentication, CORS, custom request/response handling, and general-purpose processing tasks. |
+
+---
 
 ## Additional Notes
 
- - Middleware is executed in the order it is registered. Be mindful of the sequence, especially when dealing with cross-cutting concerns like authentication, logging, and exception handling.
- - Middleware can modify both the `HttpRequest` and `HttpResponse` objects, making it an ideal place for custom request processing tasks.
+- **Execution Pipeline:** Filters are a part of the ASP.NET Core request pipeline and can work alongside middleware.
+- **Other Filter Types:** ASP.NET Core provides additional filter types, such as `ExceptionFilter`, `AuthorizationFilter`, and `ResultFilter`, for handling different stages of the request/response lifecycle.
+- **Reusable Components:** Action Filters can be reused across multiple projects to handle common concerns.
 
+---
 
+## References
 
-  
+- [Microsoft Docs - Filters in ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/filters)
+- [Action Filters Explained](https://www.tutorialsteacher.com/core/action-filters-in-aspnet-core)
 
+---
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Happy coding! ??
 

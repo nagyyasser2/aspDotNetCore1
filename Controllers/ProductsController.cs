@@ -1,4 +1,5 @@
 ﻿using aspDotNetCore.Data;
+using aspDotNetCore.Filters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security;
@@ -7,6 +8,7 @@ namespace aspDotNetCore.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [LogSensitiveAction]
     public class ProductsController : ControllerBase
     {
 
