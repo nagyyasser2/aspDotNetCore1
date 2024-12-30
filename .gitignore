@@ -1,2 +1,53 @@
 .vs/
 
+# Compiled object files
+*.o
+*.obj
+*.dll
+*.exe
+*.pdb
+*.log
+
+# Visual Studio temporary files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio build folders
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Rr]elease/
+[Dd]ebug/
+
+# ASP.NET Scaffolding
+Generated/
+
+# NPM Packages
+node_modules/
+
+# JetBrains Rider
+.idea/
+
+# macOS
+.DS_Store
+
+# Log files
+*.log
+
+# VS Code settings
+.vscode/
+
+# Test results
+TestResults/
+
+# Generated files from build
+**/bin/
+**/obj/
+
+# Local development secrets
+appsettings.Development.json
+
+# Package directories
+packages/
