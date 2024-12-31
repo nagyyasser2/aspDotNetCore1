@@ -1,197 +1,141 @@
-# ASP.NET Core Action Filters
+# ASP.NET Core Configuration Guide (Episode 1)
 
-Action Filters in ASP.NET Core API are used to execute custom logic before or after an action method runs, enabling tasks like logging, authentication, or data transformation.
-
----
-
-### Key Characteristics of Action Filters
-
-- **Action-Specific Execution:** Action filters execute custom logic before or after the execution of an action method or its result.
-- **Cross-Cutting Concerns:** Ideal for handling cross-cutting concerns such as logging, validation, and error handling specific to controller actions.
-- **Execution Order:** Filters are executed in a specific order based on their registration, with global filters running first, followed by controller-level and then action-level filters.
-- **Short-Circuiting:** Filters can modify or terminate the request/response pipeline by skipping the action method or altering the result.
+![Configuration Icon](https://static.vecteezy.com/system/resources/previews/040/190/651/non_2x/configuration-and-setting-icon-concept-vector.jpg)
 
 ---
 
-![ActionFilter Image](https://umbracare.net/media/jirailjj/asp-net-core-filters-pipeline.jpg?rmode=pad&width=1200&height=630&bgcolor=fff&v=1da493c363b43d0)
+## Overview
+This guide explains how ASP.NET Core handles configurations, including:
+- Configuration sources
+- Reading configurations
+- Predefined sources
+- Practical examples
+- Adding custom configuration files
 
 ---
 
-## How to Create an Action Filter?
+## How ASP.NET Core Finds Configuration Sources
 
-Creating a custom action filter in ASP.NET Core involves defining a class that processes HTTP requests in the pipeline. Below are the steps to create a simple `LogActivityFilter`.
-
----
-
-### Step 1: Create the ActionFilter Class
-
-1. Create a folder named `Filters` in your project (if not already created).
-2. Inside the `Filters` folder, create a file called `LogActivityFilter.cs` and define the Action Filter logic.
+The `Configuration` property retrieves all sources where configuration data is stored:
 
 ```csharp
-// LogActivityFilter.cs
-using Microsoft.AspNetCore.Mvc.Filters;
+builder.Configuration.Sources
+```
+You can modify this collection to add or remove configuration sources as needed.
 
-namespace aspDotNetCore.Filters
-{
-    public class LogActivityFilter : IActionFilter
-    {
-        private readonly ILogger<LogActivityFilter> _logger;
+---
 
-        public LogActivityFilter(ILogger<LogActivityFilter> logger)
-        {
-            _logger = logger;
-        }
+## Reading Configuration Values
+To read configuration values, use the following:
 
-        public void OnActionExecuting(ActionExecutingContext context)
-        {
-            _logger.LogInformation($"Executing Action {context.ActionDescriptor.DisplayName} on Controller {context.Controller}, With Args {context.ActionArguments}");
-        }
+```csharp
+builder.Configuration["ConnectionStrings:DefaultConnection"]
+```
 
-        public void OnActionExecuted(ActionExecutedContext context)
-        {
-            _logger.LogInformation($"Action {context.ActionDescriptor.DisplayName} Finished on Controller {context.Controller}");
-        }
-    }
-}
+For connection strings, ASP.NET Core provides a specific helper method:
+
+```csharp
+builder.Configuration.GetConnectionString("DefaultConnection")
 ```
 
 ---
 
-### Step 2: Register the ActionFilter in `Program.cs`
+## Predefined Configuration Sources
+ASP.NET Core supports the following built-in configuration sources:
 
-To enable the action filter in your application, register it in the pipeline. Open your `Program.cs` file and add the following line:
-
-```csharp
-builder.Services.AddControllers(opt =>
-{
-    opt.Filters.Add<LogActivityFilter>();
-});
-```
-
-> **Note:** The above registration is a **global** registration, meaning it will apply to all controllers and actions.
+1. **JSON Files:** `appsettings.json`, `appsettings.{Environment}.json`
+2. **Environment Variables**
+3. **User Secrets** (for local development)
 
 ---
 
-### Step 3: Apply the Filter at the Controller or Action Level (Optional)
+## Practical Example: Reading Configuration in a Controller
+Follow these steps to create a simple example:
 
-If you prefer to apply the filter to a specific controller or action instead of globally, you can use the `[ServiceFilter]` or `[TypeFilter]` attribute.
+1. Create a new controller named `ConfigController.cs`.
+2. Inject the `IConfiguration` interface to access configuration values.
 
+### Sample Code
 ```csharp
-[ServiceFilter(typeof(LogActivityFilter))]
-public class ExampleController : ControllerBase
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AspDotNetCore.Controllers
 {
-    [HttpGet]
-    public IActionResult GetExample()
-    {
-        return Ok("Action Filter Example");
-    }
-}
-```
-
----
-
-### Anohter Example About Action Filter Specific On Controller Or Action Method
-
-### Step 1: Create the `LogSensitiveActionAttribute.cs` Class
-
-1. Create a folder named `Filters` in your project (if not already created).
-2. Inside the `Filters` folder, create a file called `LogSensitiveActionAttribute.cs` and define the Action Filter logic.
-
-```csharp
-//LogSensitiveActionAttribute.cs
-
-using Microsoft.AspNetCore.Mvc.Filters;
-
-namespace aspDotNetCore.Filters
-{
-    public class LogSensitiveActionAttribute: ActionFilterAttribute
-    {
-        public override void OnActionExecuted(ActionExecutedContext context)
-        {
-            Console.WriteLine("Sentetive Action Executed...");
-        }
-    }
-}
-
-```
----
-
-### Step 2: Register the ActionFilter On `Contorller`
-
-```csharp
- [Route("api/[controller]")]
+    [Route("api/[controller]")]
     [ApiController]
-    [LogSensitiveAction]
-    public class ProductsController : ControllerBase
-    { }
-```
----
-
-### Step 3: Register the ActionFilter On `Action` .
-
-```csharp
-// Get a product by ID
-
-[HttpGet]
-[Route("{key}")]
-[LogSensitiveAction]
-public ActionResult<Product> GetProduct([FromRoute(Name = "key")] int id)
-{
-    _logger.LogDebug("trying  to get product with id#{id} ", id);
-    var product = _dbContext.Set<Product>().Find(id);
-    if (product == null)
+    public class ConfigController : ControllerBase
     {
-        _logger.LogWarning("Product #{id}, Not Found!", id);
-        return NotFound($"Product with ID {id} not found.");
-    }
+        private readonly IConfiguration _configuration;
 
-    return Ok(product);
+        public ConfigController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpGet]
+        [Route("/")]
+        public ActionResult GetConfig()
+        {
+            var config = new
+            {
+                AllowedHosts = _configuration["AllowedHosts"],
+                ConnectionStrings = _configuration.GetConnectionString("DefaultConnection"),
+                DefaultLogLevel = _configuration["Logging:LogLevel:Default"],
+                TestKey = _configuration["TestKey"],
+                SigningKey = _configuration["SigningKey"]
+            };
+
+            return Ok(config);
+        }
+    }
 }
 ```
+### Notes
+- All configuration values retrieved using this approach are returned as strings.
+
 ---
 
-> **Note:** We Can Still Register The ActionAttribute In `Program.cs` .
+## Configuration Overrides
+1. **`appsettings.{Environment}.json`** overrides `appsettings.json` based on:
+   - `ASPNETCORE_ENVIRONMENT` environment variable
+   - `launchSettings.json`
+   - User secrets (in development)
+
+2. **Environment Variables** override `appsettings.json` and `appsettings.{Environment}.json` values.
+
+---
+
+## Adding a Custom JSON Configuration File
+To add a custom JSON file:
+
+1. Create the file, e.g., `Config.json`.
+2. Add the following line in `Program.cs`:
 
 ```csharp
-// Program.cs 
-
-builder.Services.AddControllers(opt =>
-{
-    opt.Filters.Add<LogActivityFilter>();
-    opt.Filters.Add<LogSensitiveActionAttribute>();
-});
+builder.Configuration.AddJsonFile("Config.json");
 ```
 
+---
 
-
+## Adding User Secrets
+- open **cmd** in the root directory :
+```bash
+dotnet  user-secrets init
+```
+ example output: 
+```bash
+Set UserSecretsId to '766edc58-0dc5-48e7-8464-2db7bc2ebfee' for MSBuild project 'D:\NAGY_YASSER\asp.net core applications\aspDotNetCore\aspDotNetCore.csproj'.
+```
+## To Set User Secrets :
+```bash
+dotnet user-secrets set "Signingkey" "anydasldfslafd"
+```
+>[!NOTE]
+> user-secrets is just a file away from your source code.
+## Summary
+This guide covered the basics of ASP.NET Core configurations, including predefined sources, reading configurations, overrides, and adding custom configuration files. For further details, consult the [official ASP.NET Core documentation](https://learn.microsoft.com/aspnet/core).
 
 ---
 
-## Key Differences Between Action Filters and Middleware
-
-| Feature                    | Action Filters                                                                 | Middleware                                                                                     |
-|----------------------------|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| **Scope**                  | Specific to controller actions.                                                | Applies to the entire HTTP request/response pipeline.                                         |
-| **Customization**          | Can access detailed action-level metadata.                                     | Can modify `HttpRequest` and `HttpResponse` objects.                                          |
-| **Use Cases**              | Logging, validation, caching, and error handling for specific controllers.     | Authentication, CORS, custom request/response handling, and general-purpose processing tasks. |
-
----
-
-## Additional Notes
-
-- **Execution Pipeline:** Filters are a part of the ASP.NET Core request pipeline and can work alongside middleware.
-- **Other Filter Types:** ASP.NET Core provides additional filter types, such as `ExceptionFilter`, `AuthorizationFilter`, and `ResultFilter`, for handling different stages of the request/response lifecycle.
-- **Reusable Components:** Action Filters can be reused across multiple projects to handle common concerns.
-
----
-
-## References
-
-- [Microsoft Docs - Filters in ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/filters)
-- [Action Filters Explained](https://www.tutorialsteacher.com/core/action-filters-in-aspnet-core)
-
----
-
-Happy coding! ??
-
+Happy Coding! ??

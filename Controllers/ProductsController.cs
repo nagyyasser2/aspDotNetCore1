@@ -8,7 +8,6 @@ namespace aspDotNetCore.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [LogSensitiveAction]
     public class ProductsController : ControllerBase
     {
 
@@ -43,6 +42,7 @@ namespace aspDotNetCore.Controllers
         // Get a product by ID
         [HttpGet]
         [Route("{key}")]
+        [LogSensitiveAction]
         public ActionResult<Product> GetProduct([FromRoute(Name = "key")] int id)
         {
             _logger.LogDebug("trying  to get product with id#{id} ", id);
