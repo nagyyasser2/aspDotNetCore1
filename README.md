@@ -1,76 +1,104 @@
-# ASP.NET Core Configuration Guide (Episode 1)
-
+# ASP.NET Core Configuration Guide (Episode 2) `Options Pattern` .
 ![Configuration Icon](https://static.vecteezy.com/system/resources/previews/040/190/651/non_2x/configuration-and-setting-icon-concept-vector.jpg)
 
 ---
 
 ## Overview
 This guide explains how ASP.NET Core handles configurations, including:
-- Configuration sources
-- Reading configurations
-- Predefined sources
+- Reading configurations with **options pattern** .
 - Practical examples
-- Adding custom configuration files
-
 ---
 
-## How ASP.NET Core Finds Configuration Sources
+## Steps to implement options pattern .
 
-The `Configuration` property retrieves all sources where configuration data is stored:
+### 1. create your configuration section.
 
+### 2. create class to refer to the configuration section.
+
+### 3. map config section to class
+
+### Example : 
+
+- create configuration section :
+
+  ```json
+   // appsettings.json
+
+   {
+    "AllowedExtentions": "jpg,png",
+    "MaxSizeInMegaBytes": 1,
+    "EnableCompression":  true
+  }
+  ```
+- create the maping class :
+
+     ```csharp
+     // AttachmentOptions.cs
+
+    namespace aspDotNetCore.Config
+    {
+        public class AttachmentOptions
+        {
+            public string AllowedExtentions { get; set; }
+            public int MaxSizeInMegaBytes { get; set; }
+            public bool EnableCompression { get; set; }
+        }
+    }
+     ```
+- mapping, we have three types of mapping :
+
+## 1.
 ```csharp
-builder.Configuration.Sources
+// Program.cs
+
+var attachmentOptions = builder.Configuration.GetSection("AttachmentOptions").Get<AttachmentOptions>();
+
+builder.Services.AddSingleton<attachmentOptions>();
 ```
-You can modify this collection to add or remove configuration sources as needed.
-
----
-
-## Reading Configuration Values
-To read configuration values, use the following:
-
+## 2.
 ```csharp
-builder.Configuration["ConnectionStrings:DefaultConnection"]
+// Program.cs
+
+var attachmentOptions = new AttachmentOptions();
+builder.Configuration.GetSection("AttachmentOptions").Bind(attachmentOptions);
+builder.Services.AddSingleton(attachmentOptions);
+
+```
+## 3. `options-pattern` .
+```csharp
+// Program.cs
+
+builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection("Attachments"));
 ```
 
-For connection strings, ASP.NET Core provides a specific helper method:
+>[!IMPORTANT]
+> options-pattern allow us to inject `IOptions` interface which is <ins>Singleton</ins>\,
+> and `IOptionsSnapshot` which is <ins>Scoped</ins> it reload per each request and reads the values when accessing the <ins>Value</ins> property,\
+> and `IOptionsMonitor` which is <ins>Singleton</ins> it reload when update happen
+
+Example :
 
 ```csharp
-builder.Configuration.GetConnectionString("DefaultConnection")
-```
+// ConfigController.cs 
 
----
-
-## Predefined Configuration Sources
-ASP.NET Core supports the following built-in configuration sources:
-
-1. **JSON Files:** `appsettings.json`, `appsettings.{Environment}.json`
-2. **Environment Variables**
-3. **User Secrets** (for local development)
-
----
-
-## Practical Example: Reading Configuration in a Controller
-Follow these steps to create a simple example:
-
-1. Create a new controller named `ConfigController.cs`.
-2. Inject the `IConfiguration` interface to access configuration values.
-
-### Sample Code
-```csharp
+using aspDotNetCore.Config;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
-namespace AspDotNetCore.Controllers
+namespace aspDotNetCore.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class ConfigController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly IOptions<AttachmentOptions> _attachmentOptions;
 
-        public ConfigController(IConfiguration configuration)
+        public ConfigController(IConfiguration configuration, IOptions<AttachmentOptions> attachmentOptions)
         {
-            _configuration = configuration;
+            this._configuration = configuration;
+            this._attachmentOptions = attachmentOptions;
         }
 
         [HttpGet]
@@ -83,59 +111,18 @@ namespace AspDotNetCore.Controllers
                 ConnectionStrings = _configuration.GetConnectionString("DefaultConnection"),
                 DefaultLogLevel = _configuration["Logging:LogLevel:Default"],
                 TestKey = _configuration["TestKey"],
-                SigningKey = _configuration["SigningKey"]
+                SigningKey = _configuration["SigningKey"],
+                AttachmentOptions = _attachmentOptions.Value,
             };
-
             return Ok(config);
         }
     }
 }
-```
-### Notes
-- All configuration values retrieved using this approach are returned as strings.
 
----
-
-## Configuration Overrides
-1. **`appsettings.{Environment}.json`** overrides `appsettings.json` based on:
-   - `ASPNETCORE_ENVIRONMENT` environment variable
-   - `launchSettings.json`
-   - User secrets (in development)
-
-2. **Environment Variables** override `appsettings.json` and `appsettings.{Environment}.json` values.
-
----
-
-## Adding a Custom JSON Configuration File
-To add a custom JSON file:
-
-1. Create the file, e.g., `Config.json`.
-2. Add the following line in `Program.cs`:
-
-```csharp
-builder.Configuration.AddJsonFile("Config.json");
 ```
 
----
 
-## Adding User Secrets
-- open **cmd** in the root directory :
-```bash
-dotnet  user-secrets init
-```
- example output: 
-```bash
-Set UserSecretsId to '766edc58-0dc5-48e7-8464-2db7bc2ebfee' for MSBuild project 'D:\NAGY_YASSER\asp.net core applications\aspDotNetCore\aspDotNetCore.csproj'.
-```
-## To Set User Secrets :
-```bash
-dotnet user-secrets set "Signingkey" "anydasldfslafd"
-```
 >[!NOTE]
-> user-secrets is just a file away from your source code.
-## Summary
-This guide covered the basics of ASP.NET Core configurations, including predefined sources, reading configurations, overrides, and adding custom configuration files. For further details, consult the [official ASP.NET Core documentation](https://learn.microsoft.com/aspnet/core).
-
----
+> The mapping to be sucess the class must have public default parameter-less constructor .
 
 Happy Coding! ??

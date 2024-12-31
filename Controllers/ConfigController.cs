@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using aspDotNetCore.Config;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -9,10 +10,12 @@ namespace aspDotNetCore.Controllers
     public class ConfigController : ControllerBase
     {
         private readonly IConfiguration _configuration;
-      
-        public ConfigController(IConfiguration configuration)
+        private readonly IOptions<AttachmentOptions> _attachmentOptions;
+
+        public ConfigController(IConfiguration configuration, IOptions<AttachmentOptions> attachmentOptions)
         {
             this._configuration = configuration;
+            this._attachmentOptions = attachmentOptions;
         }
 
         [HttpGet]
@@ -26,6 +29,7 @@ namespace aspDotNetCore.Controllers
                 DefaultLogLevel = _configuration["Logging:LogLevel:Default"],
                 TestKey = _configuration["TestKey"],
                 SigningKey = _configuration["SigningKey"],
+                AttachmentOptions = _attachmentOptions.Value,
             };
             return Ok(config);
         }

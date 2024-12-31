@@ -1,3 +1,4 @@
+using aspDotNetCore.Config;
 using aspDotNetCore.Data;
 using aspDotNetCore.Filters;
 using aspDotNetCore.Middlewares;
@@ -5,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection("Attachments"));
 
 builder.Services.AddControllers(opt =>
 {
@@ -12,6 +14,8 @@ builder.Services.AddControllers(opt =>
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Configuration.AddJsonFile("Config.json");
 
 builder.Services.AddDbContext<ApplicationDbContext>(cfg => cfg.UseSqlServer(builder.Configuration["ConnectionStrings:DefaultConnection"]));
 
