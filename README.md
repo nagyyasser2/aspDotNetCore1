@@ -1,128 +1,213 @@
-# ASP.NET Core Configuration Guide (Episode 2) `Options Pattern` .
-![Configuration Icon](https://static.vecteezy.com/system/resources/previews/040/190/651/non_2x/configuration-and-setting-icon-concept-vector.jpg)
+# ASP.NET Core Logging  
+![Logging Icon](https://doumer.me/wp-content/uploads/2023/05/Structured-Logging-Techniques-in-ASP.net-core-.png)
+
+## Overview  
+Logging is an essential aspect of modern application development. This guide provides an overview of how ASP.NET Core handles logging, including:  
+- Understanding Log Levels.  
+- Log Providers.
+- Best practices for production and development environments.  
+- Practical examples of structured logging.  
 
 ---
 
-## Overview
-This guide explains how ASP.NET Core handles configurations, including:
-- Reading configurations with **options pattern** .
-- Practical examples
+## Log Levels  
+
+ASP.NET Core logging categorizes log messages into different levels of severity to help developers manage and filter logs effectively. Below are the log levels in ascending order of severity:  
+
+1. **Trace**  
+   - Most detailed logs.  
+   - Used for diagnostics and troubleshooting during development.  
+
+2. **Debug**  
+   - Informational messages for debugging.  
+   - Typically used in development environments.  
+
+3. **Information**  
+   - General operational events.  
+   - Represents the flow of the application.  
+
+4. **Warning**  
+   - Highlights issues that could potentially become errors.  
+   - Useful for preemptive problem detection.  
+
+5. **Error**  
+   - Indicates failures that affect specific functionality.  
+   - Does not halt the application but requires attention.  
+
+6. **Critical**  
+   - Severe errors causing complete application failure or requiring immediate attention.  
+
 ---
 
-## Steps to implement options pattern .
+## Log Providers
 
-### 1. create your configuration section.
+ASP.NET Core supports various logging providers to handle log output. Below are some commonly used log providers:
 
-### 2. create class to refer to the configuration section.
+1. **Console**  
+   - Outputs logs to the console, ideal for development and debugging environments.
 
-### 3. map config section to class
+2. **Debug**  
+   - Sends log messages to the debug output window. Useful for debugging applications locally.
 
-### Example : 
+3. **EventLog**  
+   - Writes logs to the Windows Event Log. Suitable for monitoring production systems running on Windows.
 
-- create configuration section :
+4. **TraceSource**  
+   - Integrates with `System.Diagnostics.TraceSource` to provide flexible trace logging.
 
-  ```json
-   // appsettings.json
+5. **Third-Party Providers**  
+   - Includes popular providers like **Serilog**, **NLog**, and **Log4Net** for advanced and customized logging needs.
 
-   {
-    "AllowedExtentions": "jpg,png",
-    "MaxSizeInMegaBytes": 1,
-    "EnableCompression":  true
-  }
-  ```
-- create the maping class :
+Example:
 
-     ```csharp
-     // AttachmentOptions.cs
-
-    namespace aspDotNetCore.Config
-    {
-        public class AttachmentOptions
-        {
-            public string AllowedExtentions { get; set; }
-            public int MaxSizeInMegaBytes { get; set; }
-            public bool EnableCompression { get; set; }
-        }
-    }
-     ```
-- mapping, we have three types of mapping :
-
-## 1.
 ```csharp
 // Program.cs
 
-var attachmentOptions = builder.Configuration.GetSection("AttachmentOptions").Get<AttachmentOptions>();
-
-builder.Services.AddSingleton<attachmentOptions>();
-```
-## 2.
-```csharp
-// Program.cs
-
-var attachmentOptions = new AttachmentOptions();
-builder.Configuration.GetSection("AttachmentOptions").Bind(attachmentOptions);
-builder.Services.AddSingleton(attachmentOptions);
-
-```
-## 3. `options-pattern` .
-```csharp
-// Program.cs
-
-builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection("Attachments"));
-```
-
->[!IMPORTANT]
-> options-pattern allow us to inject `IOptions` interface which is <ins>Singleton</ins>\,
-> and `IOptionsSnapshot` which is <ins>Scoped</ins> it reload per each request and reads the values when accessing the <ins>Value</ins> property,\
-> and `IOptionsMonitor` which is <ins>Singleton</ins> it reload when update happen
-
-Example :
-
-```csharp
-// ConfigController.cs 
-
-using aspDotNetCore.Config;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-
-namespace aspDotNetCore.Controllers
+builder.Services.AddLogging(cfg =>
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class ConfigController : ControllerBase
+    cfg.AddDebug();
+});
+
+```
+---
+
+## Best Practices  
+
+- **Environment-Based Logging:**  
+  - In **production**, start logging from the **Information** level and above to avoid excessive log volume.  
+  - Use **Debug** and **Trace** levels only in development environments to diagnose issues effectively.  
+
+- **Focus on Critical Levels for Clarity:**  
+  - For better readability, ensure critical and error logs are concise and meaningful.  
+  - Avoid logging unnecessary data to reduce noise and improve performance.  
+
+## Configuring Logging Levels and Providers
+
+### Specify Default and Category-Specific Logging Levels
+
+The following configuration ensures that messages from the **Information** level are logged while ignoring lower levels, such as **Debug**:
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+```
+
+- **Important:** In the above configuration, `_logger.LogDebug("Text")` will not execute as it falls below the **Information** level.
+- **Note:** You can specify logging levels for specific categories, such as `"Microsoft.AspNetCore": "Warning"`.
+
+### Specify Log Levels for Specific Providers
+
+You can configure different log levels for each provider. For example, setting a default log level of **Error** globally while setting **Trace** for the console provider:
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Error",
+      "Microsoft.AspNetCore": "Warning"
+    },
+    "Console": {
+      "LogLevel": {
+        "Default": "Trace"
+      }
+    }
+  }
+}
+```
+
+## Practical Examples  
+
+Here’s how to implement structured logging in ASP.NET Core:  
+
+### Configuring Logging in `appsettings.json`  
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "System": "Error"
+    }
+  }
+}
+```
+
+### Adding Logging in Code  
+
+```csharp
+using Microsoft.Extensions.Logging;
+
+public class WeatherForecastController : ControllerBase
+{
+    private readonly ILogger<WeatherForecastController> _logger;
+
+    public WeatherForecastController(ILogger<WeatherForecastController> logger)
     {
-        private readonly IConfiguration _configuration;
-        private readonly IOptions<AttachmentOptions> _attachmentOptions;
+        _logger = logger;
+    }
 
-        public ConfigController(IConfiguration configuration, IOptions<AttachmentOptions> attachmentOptions)
+    [HttpGet]
+    public IEnumerable<WeatherForecast> Get()
+    {
+        _logger.LogInformation("Fetching weather forecasts.");
+        try
         {
-            this._configuration = configuration;
-            this._attachmentOptions = attachmentOptions;
+            // Application logic here
         }
-
-        [HttpGet]
-        [Route("/")]
-        public ActionResult GetConfig()
+        catch (Exception ex)
         {
-            var config = new
-            {
-                AllowedHosts = _configuration["AllowedHosts"],
-                ConnectionStrings = _configuration.GetConnectionString("DefaultConnection"),
-                DefaultLogLevel = _configuration["Logging:LogLevel:Default"],
-                TestKey = _configuration["TestKey"],
-                SigningKey = _configuration["SigningKey"],
-                AttachmentOptions = _attachmentOptions.Value,
-            };
-            return Ok(config);
+            _logger.LogError(ex, "An error occurred while fetching weather forecasts.");
+            throw;
         }
     }
 }
-
 ```
 
+### Structured Logging with Serilog  
 
->[!NOTE]
-> The mapping to be sucess the class must have public default parameter-less constructor .
+Serilog is a popular third-party logging provider for ASP.NET Core.  
 
-Happy Coding! ??
+#### Install Serilog  
+
+```bash
+dotnet add package Serilog.AspNetCore
+```
+
+#### Configure Serilog  
+
+```csharp
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+});
+
+var app = builder.Build();
+app.Run();
+```
+
+---
+
+## Additional Resources  
+
+- [ASP.NET Core Documentation](https://learn.microsoft.com/en-us/aspnet/core/)  
+- [Serilog Documentation](https://serilog.net/)  
+
+---  
+
+Feel free to suggest improvements or raise issues if you find areas for enhancement. ??  
+
+---

@@ -8,6 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection("Attachments"));
 
+builder.Services.AddLogging(cfg =>
+{
+    cfg.AddDebug();
+});
+
 builder.Services.AddControllers(opt =>
 {
     opt.Filters.Add<LogActivityFilter>();
