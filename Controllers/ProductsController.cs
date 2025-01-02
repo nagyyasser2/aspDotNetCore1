@@ -1,4 +1,5 @@
-﻿using aspDotNetCore.Data;
+﻿using aspDotNetCore.Authorization;
+using aspDotNetCore.Data;
 using aspDotNetCore.Filters;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -33,6 +34,7 @@ namespace aspDotNetCore.Controllers
         // Get all products
         [HttpGet]
         [Route("")]
+        [CheckPermission(Permission.ReadProducts)]
         public ActionResult<IEnumerable<Product>> GetProducts()
         {
             var products = _dbContext.Set<Product>().ToList();

@@ -1,57 +1,66 @@
-﻿using aspCore1.ConfigSections;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Security.Claims;
-using aspCore1.Data;
+using aspDotNetCore.Data;
+using Microsoft.Extensions.Options;
 
-namespace aspCore1.Controllers
+namespace aspDotNetCore.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly JwtOptions jwtOptions;
-        private readonly ApplicationDbContext dbContext;
+        private readonly IOptions<JwtOptions> _jwtOptions;
+        private readonly ApplicationDbContext _dbContext;
 
-        public UsersController(JwtOptions jwtOptions,ApplicationDbContext dbContext)
+        public UsersController(IOptions<JwtOptions> jwtOptions, ApplicationDbContext dbContext)
         {
-            this.jwtOptions = jwtOptions;
-            this.dbContext = dbContext;
+            _jwtOptions = jwtOptions ?? throw new ArgumentNullException(nameof(jwtOptions));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
-        [HttpPost]
-        [Route("auth")]
-        public ActionResult<string> AuthenticateUser(AuthenticationRequest request)
+
+        [HttpPost("auth")]
+        public IActionResult AuthenticateUser([FromBody] AuthenticationRequest request)
         {
-            var user = dbContext.Set<User>().FirstOrDefault(x=>x.Name == request.UserName && x.Password == request.Password);
+            if (request == null || string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest("Invalid authentication request.");
+            }
+
+            var user = _dbContext.Set<User>().FirstOrDefault(x => x.Name == request.UserName && x.Password == request.Password);
             if (user == null)
             {
-                return Unauthorized();
+                return Unauthorized("Invalid username or password.");
             }
+
             var tokenHandler = new JwtSecurityTokenHandler();
+            var jwtOptions = _jwtOptions.Value;
+
+            var key = Encoding.UTF8.GetBytes(jwtOptions.SigningKey);
+            if (key.Length < 16) // Ensure sufficient key strength
+            {
+                throw new InvalidOperationException("The signing key is too short.");
+            }
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Issuer = jwtOptions.Issuer,
                 Audience = jwtOptions.Audience,
-                SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
-                    SecurityAlgorithms.HmacSha256),
-                Subject = new ClaimsIdentity(
-                    new Claim[]
-                    {
-                        new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                        new(ClaimTypes.Name, user.Name),
-                    }),
-                Expires = DateTime.UtcNow.AddHours(1) // Set token expiration
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256),
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Name, user.Name),
+                }),
+                Expires = DateTime.UtcNow.AddHours(1)
             };
 
             var securityToken = tokenHandler.CreateToken(tokenDescriptor);
             var accessToken = tokenHandler.WriteToken(securityToken);
 
-            return Ok(accessToken); // Return the generated token
+            return Ok(new { AccessToken = accessToken });
         }
-
     }
 }

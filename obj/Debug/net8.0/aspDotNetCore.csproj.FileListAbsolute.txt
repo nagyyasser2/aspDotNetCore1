@@ -180,3 +180,5 @@ D:\NAGY_YASSER\asp.net core applications\aspDotNetCoreBacup\obj\Debug\net8.0\ref
 D:\NAGY_YASSER\asp.net core applications\aspDotNetCoreBacup\obj\Debug\net8.0\aspDotNetCore.pdb
 D:\NAGY_YASSER\asp.net core applications\aspDotNetCoreBacup\obj\Debug\net8.0\aspDotNetCore.genruntimeconfig.cache
 D:\NAGY_YASSER\asp.net core applications\aspDotNetCoreBacup\obj\Debug\net8.0\ref\aspDotNetCore.dll
+D:\NAGY_YASSER\asp.net core applications\aspDotNetCore\bin\Debug\net8.0\Config.json
+D:\NAGY_YASSER\asp.net core applications\aspDotNetCore\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll

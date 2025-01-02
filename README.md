@@ -1,101 +1,150 @@
-# ASP.NET Core Bearer Authentication  
-![Authentication Icon](https://miro.medium.com/v2/resize:fit:950/0*xnSBEMwTioRQQHgE.png)
+# ASP.NET Core Permission-based Authorization
+
+![Permission](https://www.tenfold-security.com/wp-content/uploads/NTFS-vs-Share-Permissions-Example-2.png)
 
 ## Overview  
-Bearer Authentication is a token-based authentication mechanism used in ASP.NET Core applications. It involves transmitting a security token in the HTTP `Authorization` header to authenticate requests. Bearer tokens are commonly used in APIs to validate user identities and grant access to protected resources.
+Permission-based authorization in ASP.NET Core allows you to control access to resources based on fine-grained permissions assigned to users or roles. This approach provides greater flexibility compared to role-based authorization by enabling a more detailed and scalable access control system.
 
 ## Features  
-- **Secure Token-Based Authentication:** Enables secure authentication without transmitting user credentials on every request.
-- **Stateless Authentication:** Simplifies scalability by not requiring server-side session storage.
-- **Standardized Protocol:** Compatible with OAuth 2.0 and other token-based systems.
-- **Middleware Support:** Seamlessly integrates with ASP.NET Core's authentication pipeline.
+- **Granular Access Control:** Define specific permissions for various actions and resources.
+- **Dynamic Policy Management:** Add or update permissions dynamically without redeploying the application.
+- **Extensibility:** Easily integrate with custom user or role management systems.
+- **Secure Middleware Integration:** Built on ASP.NET Core's robust authentication and authorization pipeline.
 
 ## How It Works  
-1. **Token Generation:** A token is issued to a user after successful authentication, typically via a login endpoint.
-2. **Token Transmission:** The client includes the token in the `Authorization` header of subsequent requests.
-3. **Token Validation:** The server validates the token to authenticate the user.
-4. **Access Control:** The user is granted or denied access based on token claims.
+1. **Define Permissions:** Create a centralized list of permissions in your application.
+2. **Assign Permissions:** Associate permissions with users or roles in your database.
+3. **Validate Permissions:** Use custom authorization handlers to enforce permission checks.
+4. **Protect Resources:** Apply policies to controllers, actions, or endpoints based on required permissions.
 
 ## Example Implementation  
 
-### Step 1: Install Required Packages  
-Add the required NuGet packages for bearer authentication:
-```bash
-Install-Package Microsoft.AspNetCore.Authentication.JwtBearer
-```
-
-### Step 2: Configure Authentication  
-Configure the authentication service in `Program.cs` or `Startup.cs`:
+### Step 1: Define Permissions  enum
+Create a permissions class to store all permissions in a centralized location:
 ```csharp
-services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = "https://your-issuer.com",
-            ValidAudience = "https://your-audience.com",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSecretKey"))
-        };
-    });
-```
-
-### Step 3: Add Middleware  
-Ensure the authentication middleware is added to the pipeline:
-```csharp
-app.UseAuthentication();
-app.UseAuthorization();
-```
-
-### Step 4: Protect Endpoints  
-Use the `[Authorize]` attribute to secure API endpoints:
-```csharp
-[Authorize]
-[HttpGet("/api/secure-endpoint")]
-public IActionResult SecureEndpoint()
+namespace aspDotNetCore.Data
 {
-    return Ok("This is a secure endpoint!");
-}
-```
-
-### Step 5: Token Issuance Example  
-Implement a login endpoint to generate tokens:
-```csharp
-[AllowAnonymous]
-[HttpPost("/api/login")]
-public IActionResult Login([FromBody] LoginRequest loginRequest)
-{
-    if (loginRequest.Username == "user" && loginRequest.Password == "password")
+    public enum Permission
     {
-        var claims = new[] { new Claim(ClaimTypes.Name, loginRequest.Username) };
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSecretKey"));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var token = new JwtSecurityToken(
-            issuer: "https://your-issuer.com",
-            audience: "https://your-audience.com",
-            claims: claims,
-            expires: DateTime.Now.AddMinutes(30),
-            signingCredentials: creds);
-
-        return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+        ReadProducts = 1,
+        AddProducts,
+        EditProducts,
+        DeleteProducts
     }
-
-    return Unauthorized();
 }
+
+```
+
+### Step 2: Create UserPermission class  
+```csharp
+namespace aspDotNetCore.Data
+{
+    public class UserPermission
+    {
+        public int UserId { get; set; }
+        public Permission  PermissionId { get; set; }
+    }
+}
+```
+
+### Step 3: Create PermissionAttribute  
+
+```csharp
+using aspDotNetCore.Data;
+
+namespace aspDotNetCore.Authorization
+{
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class CheckPermissionAttribute: Attribute
+    {
+        public CheckPermissionAttribute(Permission permission)
+        {
+            Permission = permission;
+        }
+
+        public Permission Permission { get; }
+    }
+}
+
+```
+
+### Step 4: Apply Attribute To Method  
+Add claims to users representing their permissions:
+```csharp
+[HttpGet]
+[Route("")]
+[CheckPermission(Permission.ReadProducts)]
+public ActionResult<IEnumerable<Product>> GetProducts()
+{
+    var products = _dbContext.Set<Product>().ToList();
+    return Ok(products);
+}
+```
+
+### Step 5: Create Authorizaton Filter 
+
+```csharp
+using aspDotNetCore.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using System.Security.Claims;
+
+namespace aspDotNetCore.Authorization
+{
+    public class PermissionBasedAuthorizationFilter : IAuthorizationFilter
+    {
+        private readonly ApplicationDbContext dbContext;
+
+        public PermissionBasedAuthorizationFilter(ApplicationDbContext dbContext)
+        {
+            this.dbContext = dbContext;
+        }
+        public void OnAuthorization(AuthorizationFilterContext context)
+        {
+            var attributes = (CheckPermissionAttribute)context.ActionDescriptor.EndpointMetadata.FirstOrDefault(x => x is CheckPermissionAttribute);
+            if (attributes != null)
+            {
+                var claimIdentity = context.HttpContext.User.Identity as ClaimsIdentity;
+                if (claimIdentity == null || !claimIdentity.IsAuthenticated)
+                {
+                    context.Result = new ForbidResult();
+                }
+                else
+                {
+                    var userId = int.Parse(claimIdentity.FindFirst(ClaimTypes.NameIdentifier).Value);
+                    var hasPermisssion = dbContext.Set<UserPermission>().Any(x => x.UserId == userId && x.PermissionId == attributes.Permission);
+                    if (!hasPermisssion)
+                    {
+                        context.Result = new ForbidResult();
+                    }
+                }
+            }
+
+        }
+    }
+}
+```
+
+### Step 6: Register the filter :
+```csharp
+// Program.cs
+
+builder.Services.AddControllers(opt =>
+{
+    opt.Filters.Add<LogActivityFilter>();
+    opt.Filters.Add<PermissionBasedAuthorizationFilter>();
+});
 ```
 
 ## Security Best Practices  
-- **Use HTTPS:** Ensure all token transmissions are encrypted.
-- **Secure Secrets:** Protect signing keys and other secrets using secure storage solutions.
-- **Token Expiry:** Use short-lived tokens to minimize risk in case of compromise.
-- **Refresh Tokens:** Implement refresh tokens for seamless user sessions.
+- **Use HTTPS:** Always secure your application with HTTPS.
+- **Validate Claims:** Ensure claims are added securely and verified properly.
+- **Use Database Storage:** Store permissions and associations in a secure database.
+- **Follow Least Privilege:** Assign only necessary permissions to users or roles.
 
 ## Additional Resources  
-- [ASP.NET Core Authentication Overview](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/)
-- [JWT Bearer Authentication](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/jwt)
+- [ASP.NET Core Authorization](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/)
+- [Custom Authorization Handlers](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/policies#custom-authorization-handlers)
 
 ---
 ### Contributions  

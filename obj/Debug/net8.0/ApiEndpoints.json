@@ -1,5 +1,15 @@
 [
   {
+    "ContainingType": "aspDotNetCore.Controllers.ConfigController",
+    "Method": "GetConfig",
+    "RelativePath": "",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "aspDotNetCore.Controllers.ProductsController",
     "Method": "CreateProduct",
     "RelativePath": "api/Products",
@@ -107,5 +117,21 @@
         "StatusCode": 200
       }
     ]
+  },
+  {
+    "ContainingType": "aspDotNetCore.Controllers.UsersController",
+    "Method": "AuthenticateUser",
+    "RelativePath": "api/Users/auth",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "aspDotNetCore.Controllers.AuthenticationRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
   }
 ]

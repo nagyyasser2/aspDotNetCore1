@@ -1,10 +1,9 @@
 using aspDotNetCore;
-using aspDotNetCore.Authentication;
+using aspDotNetCore.Authorization;
 using aspDotNetCore.Config;
 using aspDotNetCore.Data;
 using aspDotNetCore.Filters;
 using aspDotNetCore.Middlewares;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,8 +12,13 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AttachmentOptions>(builder.Configuration.GetSection("Attachments"));
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
+builder.Services.AddSingleton<JwtOptions>();
+// Program.cs
+
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
 builder.Services.AddLogging(cfg =>
 {
@@ -41,6 +45,7 @@ builder.Services.AddAuthentication().
 builder.Services.AddControllers(opt =>
 {
     opt.Filters.Add<LogActivityFilter>();
+    opt.Filters.Add<PermissionBasedAuthorizationFilter>();
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
